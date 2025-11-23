@@ -2,7 +2,6 @@ flask
 python-dotenv
 mysql-connector-python
 google-generativeai
-logging
 
 pandas
 numpy
