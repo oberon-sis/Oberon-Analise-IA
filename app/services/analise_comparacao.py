@@ -124,7 +124,7 @@ def processar_request_comparacao(analise_req: AnaliseRequest):
         labels=datas_atual,
         labels_antiga=datas_anterior, # [] se vazio
         data_atual=valores_atual,
-        data_anterior=valores_anterior, # [] se vazio
+        data_antiga=valores_anterior, # [] se vazio
         data_futura=[], 
         tipo_modelo={"tipo": "Comparação Temporal", "metodo": "Delta Percentual"}
     )
