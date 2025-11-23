@@ -7,15 +7,20 @@ import json
 import random
 import numpy as np
 import pandas as pd
+
+# Modelos de Machine Learning
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.pipeline import make_pipeline
+from sklearn.ensemble import RandomForestRegressor 
 from sklearn.metrics import r2_score, mean_squared_error
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
 
 logger = logging.getLogger(__name__)
 
+
 def treinar_regressao_linear(df, passos_futuros):
+    """Modelo 1: Linear (Tendências retas)."""
     df['data_ordinal'] = df['data'].map(pd.Timestamp.toordinal)
     X = df[['data_ordinal']].values
     y = df['valor'].values
@@ -47,6 +52,7 @@ def treinar_regressao_linear(df, passos_futuros):
     }
 
 def treinar_polinomial(df, passos_futuros, grau=2):
+    """Modelo 2: Polinomial (Curvas suaves)."""
     df['data_ordinal'] = df['data'].map(pd.Timestamp.toordinal)
     X = df[['data_ordinal']].values
     y = df['valor'].values
@@ -72,7 +78,40 @@ def treinar_polinomial(df, passos_futuros, grau=2):
         "confiabilidade": min(max(r2 * 100, 0), 99)
     }
 
+def treinar_random_forest(df, passos_futuros):
+    """Modelo 3: Random Forest (Padrões complexos/irregulares)."""
+    df['data_ordinal'] = df['data'].map(pd.Timestamp.toordinal)
+    X = df[['data_ordinal']].values
+    y = df['valor'].values
+
+    # n_estimators=100: 100 arvores de decisão
+    # random_state=42: como se fosse a semente no r
+    modelo = RandomForestRegressor(n_estimators=100, random_state=42)
+    modelo.fit(X, y)
+    y_pred = modelo.predict(X)
+
+    r2 = r2_score(y, y_pred)
+    rmse = np.sqrt(mean_squared_error(y, y_pred))
+
+    ultima_data = df['data'].iloc[-1]
+    datas_futuras = [ultima_data + pd.Timedelta(days=i) for i in range(1, passos_futuros + 1)]
+    X_futuro = np.array([d.toordinal() for d in datas_futuras]).reshape(-1, 1)
+    y_futuro = modelo.predict(X_futuro)
+
+    
+    equacao = "Média de Árvores de Decisão (Não-Paramétrico)"
+
+    return {
+        "nome": "Random Forest",
+        "equacao": equacao,
+        "rmse": float(rmse),
+        "r2": float(r2),
+        "projecao": [float(round(val, 2)) for val in y_futuro],
+        "confiabilidade": min(max(r2 * 100, 0), 99)
+    }
+
 def treinar_holt(df, passos_futuros):
+    """Modelo 4: Holt (Séries temporais com nível e tendência)."""
     try:
         y = df['valor'].values
         if len(y) < 4: return None
@@ -99,11 +138,11 @@ def treinar_holt(df, passos_futuros):
         return None
 
 def selecionar_melhor_modelo(df, passos_futuros=5):
-    """escolhe o melhor modelo em base ao rmse (taxa de erro)"""
     candidatos = []
     candidatos.append(treinar_regressao_linear(df.copy(), passos_futuros))
     candidatos.append(treinar_polinomial(df.copy(), passos_futuros))
     
+    candidatos.append(treinar_random_forest(df.copy(), passos_futuros))
     res_holt = treinar_holt(df.copy(), passos_futuros)
     if res_holt:
         candidatos.append(res_holt)
@@ -113,7 +152,6 @@ def selecionar_melhor_modelo(df, passos_futuros=5):
 
 
 def processar_request_previsao(analise_req: AnaliseRequest):
-    """faz a orquestração do request ou seja é o main da previsao"""
     agrupar_por = calcular_agrupamento(analise_req.dataIncio, analise_req.dataPrevisao)
     dados_brutos = coletar_dados_historicos(analise_req, agrupar_por)
     
@@ -127,8 +165,8 @@ def processar_request_previsao(analise_req: AnaliseRequest):
     valores_historicos = [float(v) for v in df['valor'].tolist()]
     datas_historico = df['data'].dt.strftime('%d/%m').tolist()
 
-    passos_previsao = 5 # OBS: aqui eu pode aumentar 
-    resultado_modelo = selecionar_melhor_modelo(df, passos_previsao)
+    passos_previsao = 5
+    resultado_modelo = selecionar_melhor_modelo(df, passos_previsao) 
     projecao = resultado_modelo['projecao']
     
     lista_metricas = [
@@ -169,7 +207,7 @@ def processar_request_previsao(analise_req: AnaliseRequest):
 
     prompt_gemini = f"""
     Analise a previsão para '{analise_req.metricaAnalisar}'.
-    Dados Fornecidos:
+    Dados:
     - Histórico (últimos): {valores_historicos[-5:]}
     - Projeção: {projecao}
     - Modelo Vencedor: {tipo_de_modelo['melhorModelo']}
