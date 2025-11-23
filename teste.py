@@ -2,6 +2,7 @@
 
 from app.models.dataModel import AnaliseRequest
 from app.services.coleta_dados_service import coletar_dados_historicos
+from app.services.analise_previsao import processar_request_previsao
 import logging
 
 logging.basicConfig(
@@ -20,21 +21,27 @@ dados_simulacao = AnaliseRequest(
     fkMaquina= None,
     dataPrevisao="2025-12-23",
     componente=None,
+    variavelRelacionada=None
 )
 
 try:
-    dados_do_banco = coletar_dados_historicos(
+    dados_do_banco = processar_request_previsao(
         dados_simulacao, 
-        agrupar_por="HORA", 
     )
     
-    logger.info("Dados Brutos Recebidos: %s", dados_do_banco)
-    
-    if dados_do_banco:
-        logger.info("Sucesso: houve sim uma respota correta do banco")
-        for i in range(min(5, len(dados_do_banco))):
-            logger.info(dados_do_banco[i])
+    if "erro" in dados_do_banco:
+        logger.warning(" Falha, o serviço retornou um erro: %s", dados_do_banco.get("erro"))
     else:
-        logger.warning("Falha, retornou vazio as credenciais ou a Stored Procedure.")
+        logger.info(" Sucesso: O serviço retornou dados de análise.")
+        logger.info("--- Detalhes da Resposta ---")
+    # Mostra as chaves e o início dos dados, sem tentar iterar como lista
+    for chave, valor in dados_do_banco.items():
+            if isinstance(valor, list) and len(valor) > 5:
+                logger.info(f"- {chave}: [Amostra: {valor[:5]}... Total: {len(valor)} itens]")
+            else:
+                logger.info(f"- {chave}: {valor}")
+
 except RuntimeError as e:
     logger.error("❌ Erro de Runtime na conexão ou SQL: %s", e)
+except Exception as e:
+    logger.error("❌ Erro inesperado no script de teste: %s", e)
