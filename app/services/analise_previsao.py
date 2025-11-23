@@ -72,13 +72,41 @@ def treinar_polinomial(df, passos_futuros, grau=2):
         "confiabilidade": min(max(r2 * 100, 0), 99)
     }
 
+def treinar_holt(df, passos_futuros):
+    try:
+        y = df['valor'].values
+        if len(y) < 4: return None
+             
+        modelo = ExponentialSmoothing(y, trend='add', seasonal=None, damped_trend=True).fit()
+        y_pred = modelo.fittedvalues
+        
+        rmse = np.sqrt(mean_squared_error(y, y_pred))
+        ss_res = np.sum((y - y_pred) ** 2)
+        ss_tot = np.sum((y - np.mean(y)) ** 2)
+        r2 = 1 - (ss_res / ss_tot) if ss_tot != 0 else 0
+        
+        y_futuro = modelo.forecast(passos_futuros)
+
+        return {
+            "nome": "Suavização Exponencial (Holt)",
+            "equacao": "Lt = αYt + (1-α)(Lt-1 + Tt-1)",
+            "rmse": float(rmse),
+            "r2": float(r2),
+            "projecao": [float(round(val, 2)) for val in y_futuro],
+            "confiabilidade": min(max(r2 * 100, 0), 99)
+        }
+    except:
+        return None
 
 def selecionar_melhor_modelo(df, passos_futuros=5):
     """escolhe o melhor modelo em base ao rmse (taxa de erro)"""
     candidatos = []
     candidatos.append(treinar_regressao_linear(df.copy(), passos_futuros))
     candidatos.append(treinar_polinomial(df.copy(), passos_futuros))
-
+    
+    res_holt = treinar_holt(df.copy(), passos_futuros)
+    if res_holt:
+        candidatos.append(res_holt)
         
     melhor_resultado = sorted(candidatos, key=lambda x: x['rmse'])[0]
     return melhor_resultado
