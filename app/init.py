@@ -14,7 +14,7 @@ def create_app():
         datefmt='%Y-%m-%d %H:%M:%S'
     )
     
-    from .routes.ai_routes import ai_bp
+    from .routes.routes_analisis import ai_bp
     app.register_blueprint(ai_bp, url_prefix="/ai")
 
     return app
