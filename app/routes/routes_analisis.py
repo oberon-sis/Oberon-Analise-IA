@@ -13,7 +13,7 @@ def mapear_dados_entrada(dados_entrada: dict) -> AnaliseRequest:
     """Mapeia os dados brutos da requisição HTTP para a dataclass AnaliseRequest."""
     return AnaliseRequest(
         tipoAnalise=dados_entrada.get("tipoAnalise"),
-        dataIncio=dados_entrada.get("dataIncio"),
+        dataIncio=dados_entrada.get("dataInicio"),
         metricaAnalisar=dados_entrada.get("metricaAnalisar"),
         fkEmpresa=dados_entrada.get("fkEmpresa"),
         fkMaquina=dados_entrada.get("fkMaquina"),
@@ -26,7 +26,11 @@ def mapear_dados_entrada(dados_entrada: dict) -> AnaliseRequest:
 def correlacao():
     try:
         dados_entrada = request.get_json()
+        logging.info("dados_entrada")
+        logging.info(dados_entrada)
         analise_req = mapear_dados_entrada(dados_entrada)
+        logging.info("dados_entrada")
+        logging.info(analise_req)
         
         if not analise_req.variavelRelacionada:
             return jsonify({"erro": "A análise de correlação exige 'variavelRelacionada'."}), 400
