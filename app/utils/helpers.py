@@ -34,24 +34,31 @@ def formatar_resposta_frontend(
     analise_tipo: str, 
     agrupamento: str, 
     insight_ia: list, 
-    lista_metricas: list, 
-    grafico_data: dict
+    metricas: dict,
+    labels: list,
+    data_atual: list,
+    labels_antiga: list,
+    data_antiga: list,
+    data_futura: list = None,
+    tipo_modelo: dict = None 
 ) -> dict:
     """
-    Padroniza a resposta JSON para o Front-End.
-    
-    analise_tipo: Tipo da análise (ex: 'previsao', 'correlacao').
-    agrupamento: Agrupamento temporal utilizado (ex: 'DIA').
-    insight_ia: Lista de strings (parágrafos) gerada pelo Gemini.
-    lista_metricas: Lista de objetos {'metrica_titulo': str, 'metrica_valor': str}.
-    grafico_data: Dicionário com os dados do gráfico (labels, dataAtual, dataAnterior).
+    Padroniza a resposta JSON para o Front-End conforme estrutura solicitada.
     """
+    chave_metricas = "metricasRegressao" if analise_tipo == "previsao" else "metricasGerais"
     return {
         "analise_tipo": analise_tipo,
         "agrupamento": agrupamento,
         "iaMetricas": {
             "interpretacao": insight_ia,
-            "metricas": lista_metricas 
+            chave_metricas: metricas 
         },
-        "graficoData": grafico_data
+        "graficoData": {
+            "labels_Data": labels,
+            "labels_Data_Antiga": labels_antiga if labels_antiga else [],
+            "dataAtual": data_atual,
+            "dataAnterior": data_antiga if data_antiga else [],      
+            "dataFutura": data_futura if data_futura else []
+        },
+        "tipo_de_modelo": tipo_modelo if tipo_modelo else {}
     }
