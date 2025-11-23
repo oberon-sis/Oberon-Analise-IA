@@ -1,5 +1,6 @@
 from datetime import datetime
 import logging
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 def calcular_agrupamento(data_inicio_str: str, data_fim_str: str) -> str:
@@ -23,7 +24,7 @@ def calcular_agrupamento(data_inicio_str: str, data_fim_str: str) -> str:
     # else:
     #     return "MES"
         # Lógica de agrupamento:
-    if diferenca_dias <= 1:
+    if diferenca_dias <= 1: # COloca hora para tester lembrar de remover
         return "HORA"
     elif diferenca_dias <= 60: 
         return "HORA"
@@ -34,7 +35,7 @@ def formatar_resposta_frontend(
     analise_tipo: str, 
     agrupamento: str, 
     insight_ia: list, 
-    metricas: dict,
+    metricas: list,
     labels: list,
     data_atual: list,
     labels_antiga: list,
@@ -45,13 +46,12 @@ def formatar_resposta_frontend(
     """
     Padroniza a resposta JSON para o Front-End conforme estrutura solicitada.
     """
-    chave_metricas = "metricasRegressao" if analise_tipo == "previsao" else "metricasGerais"
     return {
         "analise_tipo": analise_tipo,
         "agrupamento": agrupamento,
         "iaMetricas": {
             "interpretacao": insight_ia,
-            chave_metricas: metricas 
+            "chave_metricas": metricas 
         },
         "graficoData": {
             "labels_Data": labels,
@@ -62,3 +62,16 @@ def formatar_resposta_frontend(
         },
         "tipo_de_modelo": tipo_modelo if tipo_modelo else {}
     }
+
+
+def preparar_dataframe(dados_brutos):
+    """ preparar dads em um data frame para um tratamento melhor de dados"""
+    if not dados_brutos:
+        return None
+    df = pd.DataFrame(dados_brutos, columns=['data', 'valor'])
+    df['data'] = pd.to_datetime(df['data'])
+    df['valor'] = pd.to_numeric(df['valor'], errors='coerce')
+    df = df.sort_values('data')
+    if df['valor'].isnull().any():
+        df['valor'] = df['valor'].interpolate(method='linear').fillna(method='bfill').fillna(method='ffill')
+    return df
