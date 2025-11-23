@@ -40,7 +40,7 @@ def treinar_regressao_linear(df, passos_futuros):
     coef = modelo.coef_[0]
     intercept = modelo.intercept_
     sinal = "+" if intercept >= 0 else "-"
-    equacao = f"f(x) = {coef:.2f}x {sinal} {abs(intercept):.2f}"
+    equacao = f"Equação para o gráfico:  f(x) = {coef:.2f}x {sinal} {abs(intercept):.2f}"
 
     return {
         "nome": "Regressão Linear",
@@ -71,7 +71,7 @@ def treinar_polinomial(df, passos_futuros, grau=2):
 
     return {
         "nome": f"Polinomial (Grau {grau})",
-        "equacao": f"f(x) = ax^{grau} + bx + c",
+        "equacao": f"Equação para o gráfico: f(x) = ax^{grau} + bx + c",
         "rmse": float(rmse),
         "r2": float(r2),
         "projecao": [float(round(val, 2)) for val in y_futuro],
@@ -128,7 +128,7 @@ def treinar_holt(df, passos_futuros):
 
         return {
             "nome": "Suavização Exponencial (Holt)",
-            "equacao": "Lt = αYt + (1-α)(Lt-1 + Tt-1)",
+            "equacao": "Equação para o gráfico: Lt = αYt + (1-α)(Lt-1 + Tt-1)",
             "rmse": float(rmse),
             "r2": float(r2),
             "projecao": [float(round(val, 2)) for val in y_futuro],
