@@ -2,6 +2,15 @@
 
 from app.models.dataModel import AnaliseRequest
 from app.services.coleta_dados_service import coletar_dados_historicos
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='[TESTE - %(levelname)s] %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+
 
 dados_simulacao = AnaliseRequest(
     tipoAnalise="previsao",
@@ -18,15 +27,14 @@ try:
         dados_simulacao, 
         agrupar_por="HORA", 
     )
-
-    print(dados_do_banco)
+    
+    logger.info("Dados Brutos Recebidos: %s", dados_do_banco)
     
     if dados_do_banco:
-        print("✅ Sucesso! Dados brutos coletados (amostra):")
+        logger.info("Sucesso: houve sim uma respota correta do banco")
         for i in range(min(5, len(dados_do_banco))):
-            print(dados_do_banco[i])
+            logger.info(dados_do_banco[i])
     else:
-        print("❌ Falha! Retornou lista vazia. Verifique as credenciais ou a Stored Procedure.")
-
+        logger.warning("Falha, retornou vazio as credenciais ou a Stored Procedure.")
 except RuntimeError as e:
-    print(f"❌ Erro de Runtime na conexão ou SQL: {e}")
+    logger.error("❌ Erro de Runtime na conexão ou SQL: %s", e)
