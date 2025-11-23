@@ -41,7 +41,42 @@ def coletar_dados_historicos(dados_analise: AnaliseRequest, agrupar_por: str):
     except RuntimeError as e:
         logger.error("Falha ao coletar dados históricos devido a erro de DB: %s", e)
         return []
+    
+def coletar_dados_por_intervalo(analise_req: AnaliseRequest, data_inicio: str, data_fim: str, agrupar_por: str):
+    """
+    Coleta dados para um intervalo específico
+    """
+    
+    instrucao_sql = """
+    CALL sp_coleta_dados_brutos(
+        %s,    -- p_data_inicio
+        %s,    -- p_data_fim
+        %s,    -- p_fk_empresa
+        %s,    -- p_fk_maquina
+        %s,    -- p_agrupar_por
+        %s,    -- p_metrica_analisar
+        %s     -- p_tipo_componente
+    );
+    """
+    
+    params = (
+        data_inicio + " 00:00:00",
+        data_fim + " 00:00:00",
+        analise_req.fkEmpresa,
+        analise_req.fkMaquina,
+        agrupar_por,
+        analise_req.metricaAnalisar,
+        analise_req.componente
+    )
 
+    logger.info(f"Coletando dados intervalo: {data_inicio} a {data_fim}")
+    
+    try:
+        dados_brutos = fazer_consulta_banco({"query": instrucao_sql, "params": params})
+        return dados_brutos if dados_brutos else []
+    except RuntimeError as e:
+        logger.error(f"Erro coleta intervalo: {e}")
+        return []
 
 def coletar_dados_correlacao(dados_analise: AnaliseRequest, agrupar_por: str, fk_maquina: int = None):
     # ainda a ser realizadpo
