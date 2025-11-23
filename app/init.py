@@ -1,12 +1,10 @@
 # app/init.py (Código Atualizado)
 
 from flask import Flask
-from .config import load_env
-import logging # NOVO IMPORT
+import logging 
 
 def create_app():
     app = Flask(__name__)
-    load_env(app)
 
     logging.basicConfig(
         level=logging.INFO, 
