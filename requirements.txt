@@ -1,4 +1,5 @@
-psutil
-mysql-connector-python
+flask
 python-dotenv
-pyInstaller
+mysql-connector-python
+google-generativeai
+logging
