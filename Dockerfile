@@ -10,4 +10,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-CMD ["python", "analysis_engine.py"]
+CMD ["python", "run.py"]
