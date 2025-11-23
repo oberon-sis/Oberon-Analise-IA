@@ -1,78 +1,131 @@
 from .coleta_dados_service import coletar_dados_historicos
 from .gemini_service import get_gemini_response
 from app.models.dataModel import AnaliseRequest
-from app.utils.helpers import calcular_agrupamento, formatar_resposta_frontend
+from app.utils.helpers import calcular_agrupamento, formatar_resposta_frontend, preparar_dataframe
 import logging
 import json
-import random 
+import random
+import numpy as np
+import pandas as pd
+from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import PolynomialFeatures
+from sklearn.pipeline import make_pipeline
+from sklearn.metrics import r2_score, mean_squared_error
+from statsmodels.tsa.holtwinters import ExponentialSmoothing
 
 logger = logging.getLogger(__name__)
 
-
-def previsao_linear(valores, passos=5):
-    """
-    Calcula a projeção linear simples usando a média das diferenças.
-    """
-    if len(valores) < 2:
-        return []
-
-    # Calcula a diferença média entre os pontos (tendência)
-    diffs = [valores[i+1] - valores[i] for i in range(len(valores)-1)]
+def treinar_regressao_linear(df, passos_futuros):
+    df['data_ordinal'] = df['data'].map(pd.Timestamp.toordinal)
+    X = df[['data_ordinal']].values
+    y = df['valor'].values
     
-    if not diffs:
-        return []
+    modelo = LinearRegression()
+    modelo.fit(X, y)
+    y_pred = modelo.predict(X)
+    
+    r2 = r2_score(y, y_pred)
+    rmse = np.sqrt(mean_squared_error(y, y_pred))
+    
+    ultima_data = df['data'].iloc[-1]
+    datas_futuras = [ultima_data + pd.Timedelta(days=i) for i in range(1, passos_futuros + 1)]
+    X_futuro = np.array([d.toordinal() for d in datas_futuras]).reshape(-1, 1)
+    y_futuro = modelo.predict(X_futuro)
 
-    media_diff = sum(diffs) / len(diffs)
+    coef = modelo.coef_[0]
+    intercept = modelo.intercept_
+    sinal = "+" if intercept >= 0 else "-"
+    equacao = f"f(x) = {coef:.2f}x {sinal} {abs(intercept):.2f}"
 
-    previsoes = []
-    atual = valores[-1]
+    return {
+        "nome": "Regressão Linear",
+        "equacao": equacao,
+        "rmse": float(rmse),
+        "r2": float(r2),
+        "projecao": [float(round(val, 2)) for val in y_futuro],
+        "confiabilidade": min(max(r2 * 100, 0), 99)
+    }
 
-    for _ in range(passos):
-        atual += media_diff
-        # Arredonda para 2 casas decimais
-        previsoes.append(round(atual, 2))
+def treinar_polinomial(df, passos_futuros, grau=2):
+    df['data_ordinal'] = df['data'].map(pd.Timestamp.toordinal)
+    X = df[['data_ordinal']].values
+    y = df['valor'].values
 
-    return previsoes
+    modelo = make_pipeline(PolynomialFeatures(grau), LinearRegression())
+    modelo.fit(X, y)
+    y_pred = modelo.predict(X)
+
+    r2 = r2_score(y, y_pred)
+    rmse = np.sqrt(mean_squared_error(y, y_pred))
+
+    ultima_data = df['data'].iloc[-1]
+    datas_futuras = [ultima_data + pd.Timedelta(days=i) for i in range(1, passos_futuros + 1)]
+    X_futuro = np.array([d.toordinal() for d in datas_futuras]).reshape(-1, 1)
+    y_futuro = modelo.predict(X_futuro)
+
+    return {
+        "nome": f"Polinomial (Grau {grau})",
+        "equacao": f"f(x) = ax^{grau} + bx + c",
+        "rmse": float(rmse),
+        "r2": float(r2),
+        "projecao": [float(round(val, 2)) for val in y_futuro],
+        "confiabilidade": min(max(r2 * 100, 0), 99)
+    }
+
+
+def selecionar_melhor_modelo(df, passos_futuros=5):
+    """escolhe o melhor modelo em base ao rmse (taxa de erro)"""
+    candidatos = []
+    candidatos.append(treinar_regressao_linear(df.copy(), passos_futuros))
+    candidatos.append(treinar_polinomial(df.copy(), passos_futuros))
+
+        
+    melhor_resultado = sorted(candidatos, key=lambda x: x['rmse'])[0]
+    return melhor_resultado
 
 
 def processar_request_previsao(analise_req: AnaliseRequest):
-    """
-    Orquestra a coleta, cálculo preditivo no Python e análise de Insight via Gemini.
-    """
-    
+    """faz a orquestração do request ou seja é o main da previsao"""
     agrupar_por = calcular_agrupamento(analise_req.dataIncio, analise_req.dataPrevisao)
-    
     dados_brutos = coletar_dados_historicos(analise_req, agrupar_por)
     
     if not dados_brutos:
-        logger.warning("Processamento de Previsão cancelado: dados brutos vazios.")
-        return {
-            "analise_tipo": "previsao",
-            "erro": "Sem dados históricos no período para realizar a previsão."
+        return {"analise_tipo": "previsao", "erro": "Sem dados históricos."}
+    
+    df = preparar_dataframe(dados_brutos)
+    if df is None or len(df) < 5:
+        return {"analise_tipo": "previsao", "erro": "Dados insuficientes (mínimo 5 pontos)."}
+
+    valores_historicos = [float(v) for v in df['valor'].tolist()]
+    datas_historico = df['data'].dt.strftime('%d/%m').tolist()
+
+    passos_previsao = 5 # OBS: aqui eu pode aumentar 
+    resultado_modelo = selecionar_melhor_modelo(df, passos_previsao)
+    projecao = resultado_modelo['projecao']
+    
+    lista_metricas = [
+        {
+            "titulo": "Modelo Utilizado",
+            "valor": resultado_modelo['nome']
+        },
+        {
+            "titulo": "Precisão (R²)",
+            "valor": f"{resultado_modelo['r2']:.2f}"
+        },
+        {
+            "titulo": "Taxa de Erro (RMSE)", 
+            "valor": f"{resultado_modelo['rmse']:.2f}"
+        },
+        {
+            "titulo": "Confiabilidade",
+            "valor": f"{int(resultado_modelo['confiabilidade'])}%"
         }
-    
-    datas_historico = [str(dado[0]) for dado in dados_brutos]
-    valores = [float(dado[1]) for dado in dados_brutos]
-    
-    passos_previsao = 5 
-    projeção = previsao_linear(valores, passos_previsao)
-    
-    R2_simulado = f"{random.uniform(0.70, 0.95):.2f}"
-    
-    metricas_raw = {
-        "R": f"{random.uniform(0.85, 0.99):.2f}",
-        "R2": R2_simulado,
-        "RSE": f"{random.uniform(2.0, 10.0):.2f}%",
-        "Confiabilidade": f"{int(float(R2_simulado) * 100)}%"
-    }
-    
-    #transorma para o front
-    lista_metricas_front = [
-        {"metrica_titulo": "Coeficiente R", "metrica_valor": metricas_raw["R"]},
-        {"metrica_titulo": "R² (Determinação)", "metrica_valor": metricas_raw["R2"]},
-        {"metrica_titulo": "Erro Padrão (RSE)", "metrica_valor": metricas_raw["RSE"]},
-        {"metrica_titulo": "Confiabilidade", "metrica_valor": metricas_raw["Confiabilidade"]}
     ]
+    
+    tipo_de_modelo = {
+        "melhorModelo": resultado_modelo['nome'],
+        "equacao": resultado_modelo['equacao']
+    }
 
     json_schema_ia = {
         "type": "object",
@@ -80,56 +133,46 @@ def processar_request_previsao(analise_req: AnaliseRequest):
             "interpretacao": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "Lista de 1 a 2 parágrafos de análise textual (tendência histórica, o que a projeção sugere, e recomendação baseada nas métricas)."
+                "description": "Lista de 2 parágrafos curtos."
             }
         },
         "required": ["interpretacao"]
     }
 
-    # Prompt instruindo o Gemini a ser um Analista Sênior e usar os dados fornecidos
     prompt_gemini = f"""
-    Você é um Analista de Dados Sênior. Sua tarefa é INTERPRETAR os resultados.
-
+    Analise a previsão para '{analise_req.metricaAnalisar}'.
     Dados Fornecidos:
-    - Métrica: '{analise_req.metricaAnalisar}'
-    - Agrupamento: {agrupar_por}
-    - Histórico ({len(valores)} pontos): {valores}
-    - Projeção Futura ({passos_previsao} períodos): {projeção}
-    - Modelo Utilizado: Regressão Linear Simples
-    - Coeficiente de Determinação (R2): {metricas_raw['R2']}
-    - Confiabilidade (Simulada): {metricas_raw['Confiabilidade']}
-
-    Gere uma interpretação em 2 a 3 parágrafos curtos em Português do Brasil, estritamente no formato JSON (chave 'interpretacao'):
-    1. Descreva a **tendência histórica** e o que a projeção calculada sugere para o futuro.
-    2. Com base nas métricas (especialmente o R2 e a Confiabilidade), comente a **qualidade da projeção**.
-    3. Dê uma **recomendação** sucinta (Ação imediata, monitoramento, etc.).
+    - Histórico (últimos): {valores_historicos[-5:]}
+    - Projeção: {projecao}
+    - Modelo Vencedor: {tipo_de_modelo['melhorModelo']}
+    - Erro (RMSE): {resultado_modelo['rmse']:.2f}
+    - Precisão (R²): {resultado_modelo['r2']:.2f}
+    
+    Gere 2 parágrafos curtos para 'interpretacao':
+    1. Análise da tendência e projeção futura.
+    2. Comentário sobre a confiabilidade do modelo e recomendação.
     """
     
     try:
         resposta_ia_json_str = get_gemini_response(prompt_gemini, json_schema_ia)
         ia_data = json.loads(resposta_ia_json_str)
-        insight_ia = ia_data.get("interpretacao", ["Erro ao gerar insight."])
-        
+        insight_ia = ia_data.get("interpretacao", ["Análise indisponível."])
     except Exception as e:
-        logger.error("Falha ao gerar ou desserializar JSON do Gemini (Insight): %s", e)
-        insight_ia = ["Erro ao gerar insight por IA. Verifique a chave e o JSON de retorno."]
-        
-    data_anterior_simulada = [max(0, v + random.randint(-15, 15)) for v in valores]
+        logger.error("Falha Gemini: %s", e)
+        insight_ia = ["Erro na geração de insight."]
 
-    data_grafico_principal = valores + projeção 
-    
-    labels_datas = datas_historico + [f"P+{i+1}" for i in range(passos_previsao)]
-    
-    dados_grafico_front = {
-        "labels_Data": labels_datas, 
-        "dataAtual": data_grafico_principal, 
-        "dataAnterior": data_anterior_simulada, 
-    }
+    labels_futuros = [f"Futuro {i+1}" for i in range(passos_previsao)]
+    labels_totais = datas_historico + labels_futuros
     
     return formatar_resposta_frontend(
         analise_tipo="previsao",
         agrupamento=agrupar_por,
         insight_ia=insight_ia,
-        lista_metricas=lista_metricas_front,
-        grafico_data=dados_grafico_front
+        metricas=lista_metricas, 
+        labels=labels_totais,
+        data_atual=valores_historicos,
+        labels_antiga = [],
+        data_antiga = [],
+        data_futura=projecao, 
+        tipo_modelo=tipo_de_modelo
     )
