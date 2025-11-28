@@ -51,6 +51,48 @@ def interpretar_correlacao(r):
     if abs_r > 0.3: return "Fraca"
     return "Inexistente/Desprezível"
 
+def calcular_regressao_linear(df):
+    """
+    Calcula os coeficientes da regressão linear (Y = B0 + B1 * X)
+    e gera dois pontos para desenhar a linha no frontend.
+    Y = valor_a (Métrica Principal)
+    X = valor_b (Variável Relacionada)
+    """
+    if len(df) < 2:
+        return None, None, None
+
+    # Ajuste polinomial de grau 1: [B1 (inclinação), B0 (intercepto)]
+    # Usamos X = valor_b e Y = valor_a
+    coeficientes = np.polyfit(df['valor_b'], df['valor_a'], 1)
+    
+    # B1 (inclinação) e B0 (intercepto)
+    inclinacao_b1 = coeficientes[0] 
+    intercepto_b0 = coeficientes[1]
+    
+    # -----------------------------------------------------------------
+    # Geração dos Pontos para o Gráfico
+    
+    # Encontra os valores min/max de X (valor_b) para definir a extensão da linha
+    x_min = df['valor_b'].min()
+    x_max = df['valor_b'].max()
+
+    # Se min e max forem iguais (como no seu exemplo), adicione uma pequena margem
+    if x_min == x_max:
+        x_min -= 1 
+        x_max += 1
+
+    # Calcula os valores Y (valor_a) correspondentes usando a equação: Y = B0 + B1 * X
+    y_min = intercepto_b0 + inclinacao_b1 * x_min
+    y_max = intercepto_b0 + inclinacao_b1 * x_max
+
+    # Formato de retorno para o frontend
+    linha_regressao = [
+        {"x": round(float(x_min), 2), "y": round(float(y_min), 2)},
+        {"x": round(float(x_max), 2), "y": round(float(y_max), 2)}
+    ]
+    
+    return inclinacao_b1, intercepto_b0, linha_regressao
+
 
 def processar_request_correlacao(analise_req: AnaliseRequest):
     """
@@ -86,6 +128,8 @@ def processar_request_correlacao(analise_req: AnaliseRequest):
     if df is None or len(df) < 2:
         return {"analise_tipo": "correlacao", "erro": "Poucos dados em comum (datas não batem)."}
 
+    inclinacao_b1, intercepto_b0, linha_regressao = calcular_regressao_linear(df)
+
     pearson_r = calcular_pearson(df)
     intensidade = interpretar_correlacao(pearson_r)
     
@@ -116,6 +160,7 @@ def processar_request_correlacao(analise_req: AnaliseRequest):
     
     Dados:
     - Coeficiente de Pearson (r): {pearson_r:.2f} ({intensidade})
+    - Regressão Linear: Y = {intercepto_b0:.2f} + {inclinacao_b1:.2f} * X
     - Amostra de Dados A: {valores_a[-5:]}
     - Amostra de Dados B: {valores_b[-5:]}
     
@@ -144,5 +189,6 @@ def processar_request_correlacao(analise_req: AnaliseRequest):
         labels_antiga = [],
         data_futura=[],            
         data_antiga=valores_b,  
-        tipo_modelo={"tipo": "Correlação Estatística", "metodo": "Pearson"}
+        tipo_modelo={"tipo": "Correlação Estatística", "metodo": "Pearson"},
+        linha_regressao=linha_regressao if linha_regressao else []
     )
