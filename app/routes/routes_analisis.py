@@ -1,10 +1,12 @@
 from flask import Blueprint, request, jsonify
 from app.models.dataModel import AnaliseRequest
+from app.models.dataModelIA import IARequest
 import logging
 
 from app.services.analise_previsao import processar_request_previsao
 from app.services.analise_comparacao import processar_request_comparacao
 from app.services.analise_correlacao import processar_request_correlacao 
+from app.services.respose_ia import processar_request_pergunta
 
 logger = logging.getLogger(__name__)
 ai_bp = Blueprint("ai", __name__)
@@ -20,6 +22,12 @@ def mapear_dados_entrada(dados_entrada: dict) -> AnaliseRequest:
         dataPrevisao=dados_entrada.get("dataPrevisao"),
         componente=dados_entrada.get("componente"),
         variavelRelacionada=dados_entrada.get("variavelRelacionada")
+    )
+
+def mapear_dados_entrada_ia(dados_entrada: dict) -> AnaliseRequest:
+    """Mapeia os dados brutos da requisição HTTP para a dataclass AnaliseRequest."""
+    return AnaliseRequest(
+        pergunta=dados_entrada.get("pergunta"),
     )
 
 @ai_bp.route("/correlacao", methods=["POST"])
@@ -85,6 +93,33 @@ def previsao():
             return jsonify({"erro": "A análise de previsão exige 'dataPrevisao'."}), 400
 
         resultado_final = processar_request_previsao(analise_req)
+        
+        if "erro" in resultado_final:
+            return jsonify(resultado_final), 400
+            
+        return jsonify(resultado_final), 200
+
+    except Exception as e:
+        logger.error("Erro inesperado na rota /previsao: %s", e)
+        return jsonify({"erro": f"Falha no processamento da requisição: {e}"}), 500
+    
+@ai_bp.route("/responseIa", methods=["POST"])
+
+
+def responseIa():
+    """
+    Rota refatorada para Análise de Previsão.
+    O Controller apenas recebe, formata e delega.
+    """
+    try:
+        dados_entrada = request.get_json()
+        
+        analise_req = mapear_dados_entrada_ia(dados_entrada)
+
+        if not analise_req.dataPrevisao:
+            return jsonify({"erro": "A análise de previsão exige 'dataPrevisao'."}), 400
+
+        resultado_final = processar_request_pergunta(analise_req)
         
         if "erro" in resultado_final:
             return jsonify(resultado_final), 400
