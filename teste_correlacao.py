@@ -8,19 +8,20 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
 dados_simulacao = AnaliseRequest(
     tipoAnalise="correlacao",
-    dataIncio="2025-10-23",
-    dataPrevisao="2025-12-23", # Data fim obrigatória
+    dataIncio="2025-08-26",
+    dataPrevisao="2025-12-03", # Data fim obrigatória
     
     # CORRIJA AQUI: Use um nome que seu SP conhece.
     # Se sua SP não tem 'Downtime' implementado, use 'Total de Alertas' vs 'Uso CPU' para testar
-    metricaAnalisar="Total de Alertas", 
-    variavelRelacionada="Uso CPU",      
+    metricaAnalisar="Uptime", 
+    variavelRelacionada="Total de Alertas",      
     
-    fkEmpresa=1, 
+    fkEmpresa=2, 
     fkMaquina=None, 
-    componente=None
+    componente="RAM"
 )
 
 try:
