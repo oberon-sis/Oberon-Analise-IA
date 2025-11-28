@@ -29,7 +29,7 @@ def coletar_dados_historicos(dados_analise: AnaliseRequest, agrupar_por: str):
         dados_analise.componente
     )
 
-    logger.info("Parâmetros da SP sendo enviados: %s", params)
+    logger.info("Parâmetros da SP coletar_dados_historicos sendo enviados: %s", params)
     
     try:
         dados_brutos = fazer_consulta_banco({"query": instrucao_sql, "params": params})
@@ -68,7 +68,7 @@ def coletar_dados_por_intervalo(analise_req: AnaliseRequest, data_inicio: str, d
         analise_req.metricaAnalisar,
         analise_req.componente
     )
-
+    logger.info("coletar_dados_por_intervalo")
     logger.info(f"Coletando dados intervalo: {data_inicio} a {data_fim}")
     
     try:
