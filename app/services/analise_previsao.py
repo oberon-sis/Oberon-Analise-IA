@@ -240,5 +240,6 @@ def processar_request_previsao(analise_req: AnaliseRequest):
         labels_antiga = [],
         data_antiga = [],
         data_futura=projecao, 
-        tipo_modelo=tipo_de_modelo
+        tipo_modelo=tipo_de_modelo,
+        linha_regressao = []
     )
