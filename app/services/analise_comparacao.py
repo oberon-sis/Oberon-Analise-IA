@@ -116,7 +116,7 @@ def processar_request_comparacao(analise_req: AnaliseRequest):
         logger.error("Falha Gemini Comparação: %s", e)
         insight_ia = ["Erro na geração de análise."]
 
-    return formatar_resposta_frontend(
+    resposta =  formatar_resposta_frontend(
         analise_tipo="comparacao",
         agrupamento=agrupar_por,
         insight_ia=insight_ia,
@@ -126,5 +126,8 @@ def processar_request_comparacao(analise_req: AnaliseRequest):
         data_atual=valores_atual,
         data_antiga=valores_anterior, # [] se vazio
         data_futura=[], 
-        tipo_modelo={"tipo": "Comparação Temporal", "metodo": "Delta Percentual"}
+        tipo_modelo={"tipo": "Comparação Temporal", "metodo": "Delta Percentual"},
+        linha_regressao=[]
     )
+    print(resposta)
+    return resposta
