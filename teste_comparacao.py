@@ -2,7 +2,7 @@
 
 from app.models.dataModel import AnaliseRequest
 from app.services.coleta_dados_service import coletar_dados_historicos
-from app.services.analise_comparacao import processar_request_correlacao
+from app.services.analise_comparacao import processar_request_comparacao
 import logging
 
 logging.basicConfig(
@@ -11,21 +11,24 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-
+#teste: total de alertas: ok
+#teste: criticos: ok
+#teste: Alertas Atenção: ok
+#teste: Alertas Ocioso: ok
 
 dados_simulacao = AnaliseRequest(
-    tipoAnalise="correlaco",
+    tipoAnalise="comparacao",
     dataIncio="2025-10-23",
-    metricaAnalisar="Total de Alertas",
-    fkEmpresa= 1, 
+    metricaAnalisar="total de alertas",
+    fkEmpresa= 2, 
     fkMaquina= None,
     dataPrevisao=None,
-    componente=None,
+    componente="CPU",
     variavelRelacionada=None
 )
 
 try:
-    dados_do_banco = processar_request_correlacao(
+    dados_do_banco = processar_request_comparacao(
         dados_simulacao, 
     )
     
