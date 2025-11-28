@@ -17,19 +17,19 @@ def calcular_agrupamento(data_inicio_str: str, data_fim_str: str) -> str:
         return "DIA"
     
     # # Lógica de agrupamento:
-    # if diferenca_dias <= 1:
+    if diferenca_dias <= 1:
+        return "HORA"
+    elif diferenca_dias <= 200: 
+        return "DIA"
+    else:
+        return "MES"
+        # Lógica de agrupamento:
+    # if diferenca_dias <= 1: # COloca hora para tester lembrar de remover
     #     return "HORA"
     # elif diferenca_dias <= 60: 
-    #     return "DIA"
+    #     return "HORA"
     # else:
-    #     return "MES"
-        # Lógica de agrupamento:
-    if diferenca_dias <= 1: # COloca hora para tester lembrar de remover
-        return "HORA"
-    elif diferenca_dias <= 60: 
-        return "HORA"
-    else:
-        return "HORA"
+    #     return "HORA"
     
 def formatar_resposta_frontend(
     analise_tipo: str, 
@@ -41,7 +41,8 @@ def formatar_resposta_frontend(
     labels_antiga: list,
     data_antiga: list,
     data_futura: list = None,
-    tipo_modelo: dict = None 
+    tipo_modelo: dict = None,
+    linha_regressao: list = None
 ) -> dict:
     """
     Padroniza a resposta JSON para o Front-End conforme estrutura solicitada.
@@ -60,7 +61,8 @@ def formatar_resposta_frontend(
             "dataAnterior": data_antiga if data_antiga else [],      
             "dataFutura": data_futura if data_futura else []
         },
-        "tipo_de_modelo": tipo_modelo if tipo_modelo else {}
+        "tipo_de_modelo": tipo_modelo if tipo_modelo else {},
+        "linha_regressao": linha_regressao
     }
 
 
@@ -75,3 +77,14 @@ def preparar_dataframe(dados_brutos):
     if df['valor'].isnull().any():
         df['valor'] = df['valor'].interpolate(method='linear').fillna(method='bfill').fillna(method='ffill')
     return df
+
+
+def formatar_resposta_frontend_ia(
+    resposta: str, 
+) -> dict:
+    """
+    Padroniza a resposta JSON para o Front-End conforme estrutura solicitada.
+    """
+    return {
+        "resposta": resposta,
+    }
