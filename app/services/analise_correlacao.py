@@ -105,8 +105,6 @@ def processar_request_correlacao(analise_req: AnaliseRequest):
     agrupar_por = calcular_agrupamento(analise_req.dataIncio, analise_req.dataPrevisao)
     
     dados_a = coletar_dados_historicos(analise_req, agrupar_por)
-    logging.info("dados_da variavel analisada")
-    logging.info(dados_a)
     req_b = AnaliseRequest(
         tipoAnalise=analise_req.tipoAnalise,
         dataIncio=analise_req.dataIncio,
@@ -118,8 +116,7 @@ def processar_request_correlacao(analise_req: AnaliseRequest):
         variavelRelacionada=None
     )
     dados_b = coletar_dados_historicos(req_b, agrupar_por)
-    logging.info("dadod da varivel relacionada: ")
-    logging.info(dados_b)
+    
     if not dados_a or not dados_b:
         return {"analise_tipo": "correlacao", "erro": "Sem dados suficientes para uma das variáveis."}
 
@@ -149,24 +146,28 @@ def processar_request_correlacao(analise_req: AnaliseRequest):
             "interpretacao": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "Lista de 2 parágrafos."
+                "description": "Lista de 2 parágrafos curtos."
             }
         },
         "required": ["interpretacao"]
     }
 
+    var_a = analise_req.metricaAnalisar
+    var_b = analise_req.variavelRelacionada
+
     prompt_gemini = f"""
-    Atue como Cientista de Dados. Analise a correlação entre '{analise_req.metricaAnalisar}' (Variável A) e '{analise_req.variavelRelacionada}' (Variável B).
-    
-    Dados:
-    - Coeficiente de Pearson (r): {pearson_r:.2f} ({intensidade})
-    - Regressão Linear: Y = {intercepto_b0:.2f} + {inclinacao_b1:.2f} * X
-    - Amostra de Dados A: {valores_a[-5:]}
-    - Amostra de Dados B: {valores_b[-5:]}
-    
-    Gere 2 parágrafos curtos para 'interpretacao':
-    1. Explique a relação encontrada (positiva, negativa ou neutra) e sua força.
-    2. Dê uma interpretação de negócio: uma métrica influencia a outra? É causa ou coincidência?
+    **ROLE:** Analista Sênior de Suporte N3 / SRE (Site Reliability Engineer).
+    **OBJETIVO:** Fornecer um diagnóstico de causa-raiz imediato para Estações de Trabalho CFTV.
+    **REGRAS:** Gere 2 parágrafos curtos. MÁXIMO 30 PALAVRAS por parágrafo. Use linguagem de alguém que cria solução de problemas.
+
+    **ANÁLISE DE CORRELAÇÃO:**
+    - Variável A (Y): '{var_a}' (Principal)
+    - Variável B (X): '{var_b}' (Relacionada)
+    - Coeficiente Pearson (r): {pearson_r:.2f} ({intensidade})
+
+    **OUTPUT JSON (2 strings):**
+    1. **Diagnóstico (Causa-Raiz):** Veredito final: A Variável B é a causa do problema na Variável A? (Se r > 0.7: "Correlação Forte. '{var_b}' é a causa principal de '{var_a}'." | Se r < 0.3: "Correlação desprezível. Hipótese de impacto de '{var_b}' descartada.").
+    2. **Ação Técnica:** Instrução imediata de alguém que cria solução de problemas. (Se Forte: "Gargalo de hardware provável. Analisar o uso exato do componente B para provisionamento ou ajuste de software." | Se Fraca: "Descartar esta hipótese. Verifique a Latência de Rede ou o Event Viewer da máquina.").
     """
     
     try:
@@ -177,8 +178,6 @@ def processar_request_correlacao(analise_req: AnaliseRequest):
         logger.error("Falha Gemini Correlação: %s", e)
         insight_ia = ["Erro na geração de análise."]
 
-    # Na correlação, enviamos 'dataAtual' como Métrica A e 'dataAnterior' como Métrica B 
-    
     return formatar_resposta_frontend(
         analise_tipo="correlacao",
         agrupamento=agrupar_por,
