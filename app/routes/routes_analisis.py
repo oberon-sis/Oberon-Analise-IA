@@ -24,10 +24,10 @@ def mapear_dados_entrada(dados_entrada: dict) -> AnaliseRequest:
         variavelRelacionada=dados_entrada.get("variavelRelacionada")
     )
 
-def mapear_dados_entrada_ia(dados_entrada: dict) -> AnaliseRequest:
+def mapear_dados_entrada_ia(dados_entrada: dict) -> IARequest:
     """Mapeia os dados brutos da requisição HTTP para a dataclass AnaliseRequest."""
-    return AnaliseRequest(
-        pergunta=dados_entrada.get("pergunta"),
+    return IARequest(
+        pergunta=dados_entrada.get('pergunta'),
     )
 
 @ai_bp.route("/correlacao", methods=["POST"])
@@ -104,20 +104,17 @@ def previsao():
         return jsonify({"erro": f"Falha no processamento da requisição: {e}"}), 500
     
 @ai_bp.route("/responseIa", methods=["POST"])
-
-
 def responseIa():
     """
-    Rota refatorada para Análise de Previsão.
-    O Controller apenas recebe, formata e delega.
+    Rota para responder perguntas gerais via IA.
     """
     try:
         dados_entrada = request.get_json()
         
         analise_req = mapear_dados_entrada_ia(dados_entrada)
 
-        if not analise_req.dataPrevisao:
-            return jsonify({"erro": "A análise de previsão exige 'dataPrevisao'."}), 400
+        if not analise_req.pergunta:
+            return jsonify({"erro": "O campo 'pergunta' é obrigatório."}), 400
 
         resultado_final = processar_request_pergunta(analise_req)
         
@@ -127,5 +124,5 @@ def responseIa():
         return jsonify(resultado_final), 200
 
     except Exception as e:
-        logger.error("Erro inesperado na rota /previsao: %s", e)
+        logger.error("Erro inesperado na rota /responseIa: %s", e)
         return jsonify({"erro": f"Falha no processamento da requisição: {e}"}), 500
