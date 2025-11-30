@@ -34,21 +34,18 @@ def preparar_dataframe_comparacao(dados_brutos):
 
 
 def processar_request_comparacao(analise_req: AnaliseRequest):
-    # define o periodo anterior
     data_inicio_atual = analise_req.dataIncio
     data_fim_atual = analise_req.dataPrevisao or datetime.now().strftime('%Y-%m-%d')
     
     data_inicio_ant, data_fim_ant = calcular_periodo_anterior(data_inicio_atual, data_fim_atual)
     agrupar_por = calcular_agrupamento(data_inicio_atual, data_fim_atual)
     
-    #  Coleta de Dados
     dados_atual = coletar_dados_por_intervalo(analise_req, data_inicio_atual, data_fim_atual, agrupar_por)
     dados_anterior = coletar_dados_por_intervalo(analise_req, data_inicio_ant, data_fim_ant, agrupar_por)
     
     if not dados_atual:
         return {"analise_tipo": "comparacao", "erro": "Sem dados para o período atual selecionado."}
 
-    # 3. Tratamento
     df_atual = preparar_dataframe_comparacao(dados_atual)
     df_anterior = preparar_dataframe_comparacao(dados_anterior)
     
@@ -74,7 +71,6 @@ def processar_request_comparacao(analise_req: AnaliseRequest):
         { "titulo": "Média Diária (Atual)", "valor": f"{media_atual:.1f}" }
     ]
     
-    # Dados para o Front
     valores_atual = [float(v) for v in df_atual['valor'].tolist()]
     datas_atual = df_atual['data'].dt.strftime('%d/%m').tolist()
     
@@ -85,27 +81,41 @@ def processar_request_comparacao(analise_req: AnaliseRequest):
         valores_anterior = [float(v) for v in df_anterior['valor'].tolist()]
         datas_anterior = df_anterior['data'].dt.strftime('%d/%m').tolist()
 
+    dados_atual_str = df_atual[['data', 'valor']].to_json(orient='records', date_format='iso')
+    dados_anterior_str = df_anterior[['data', 'valor']].to_json(orient='records', date_format='iso') if not df_anterior.empty else "[]"
+
     json_schema_ia = {
         "type": "object",
         "properties": {
             "interpretacao": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "Lista de 2 parágrafos."
+                "description": "Lista exata de 2 parágrafos curtos."
             }
         },
         "required": ["interpretacao"]
     }
 
+    contexto_componente = f" ({analise_req.componente})" if analise_req.componente and analise_req.componente != 'TODOS' else ""
+    nome_metrica = f"{analise_req.metricaAnalisar}{contexto_componente}"
+
     prompt_gemini = f"""
-    Atue como Analista de Performance. Compare a métrica '{analise_req.metricaAnalisar}'.
-    - Atual: Total={total_atual:.0f}
-    - Anterior: Total={total_anterior:.0f}
-    - Variação: {delta_str}
+    **ROLE:** SysAdmin Sênior / Especialista em Monitoramento.
+    **USUÁRIO:** Analista de TI (Técnico). Use linguagem técnica direta.
+    **OBJETIVO:** Troubleshooting rápido baseado na variação de métricas.
+    **REGRAS:** Máximo 30 palavras por parágrafo. Sem enrolação.
+
+    **TELEMETRIA:**
+    - Métrica: {nome_metrica}
+    - Delta: {delta_str} (Atual: {total_atual:.0f} vs Anterior: {total_anterior:.0f})
     
-    Gere 2 parágrafos curtos para 'interpretacao':
-    1. Analise a mudança de comportamento.
-    2. Explique se a variação é positiva/negativa e recomende ação.
+    **LOGS TEMPORAIS (JSON):**
+    - Atual: {dados_atual_str}
+    - Anterior: {dados_anterior_str}
+
+    **OUTPUT JSON (2 strings):**
+    1. **Diagnóstico Técnico:** Identifique a anomalia. Em qual dia exato ocorreu o pico/queda que causou o delta de {delta_str}? Classifique como "Degradação" (Piora) ou "Estabilização" (Melhora).
+    2. **Ação Recomendada (Nível L2/L3):** O que o analista deve fazer na máquina? (Ex: "Verificar Event Viewer do dia X", "Analisar processos com alto consumo", "Validar serviço de gravação", "Checar logs do VMS").
     """
     
     try:
@@ -116,18 +126,16 @@ def processar_request_comparacao(analise_req: AnaliseRequest):
         logger.error("Falha Gemini Comparação: %s", e)
         insight_ia = ["Erro na geração de análise."]
 
-    resposta =  formatar_resposta_frontend(
+    return formatar_resposta_frontend(
         analise_tipo="comparacao",
         agrupamento=agrupar_por,
         insight_ia=insight_ia,
         metricas=lista_metricas,
         labels=datas_atual,
-        labels_antiga=datas_anterior, # [] se vazio
+        labels_antiga=datas_anterior, 
         data_atual=valores_atual,
-        data_antiga=valores_anterior, # [] se vazio
+        data_antiga=valores_anterior, 
         data_futura=[], 
         tipo_modelo={"tipo": "Comparação Temporal", "metodo": "Delta Percentual"},
         linha_regressao=[]
     )
-    print(resposta)
-    return resposta
