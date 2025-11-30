@@ -169,10 +169,29 @@ def processar_request_previsao(analise_req: AnaliseRequest):
     resultado_modelo = selecionar_melhor_modelo(df, passos_previsao) 
     projecao = resultado_modelo['projecao']
     
+    ultimo_valor_real = valores_historicos[-1] if valores_historicos else 0
+    ultimo_valor_previsto = projecao[-1] if projecao else 0
+    confianca = int(resultado_modelo['confiabilidade'])
+    nome_modelo = resultado_modelo['nome']
+    
+    contexto_componente = f" ({analise_req.componente})" if analise_req.componente and analise_req.componente != 'TODOS' else ""
+    nome_metrica = f"{analise_req.metricaAnalisar}{contexto_componente}"
+    
+    risco = "NORMAL"
+    if nome_metrica.upper().find('DISCO') > -1 and ultimo_valor_previsto > 90:
+        risco = "CRÍTICO"
+    elif nome_metrica.upper().find('RAM') > -1 and ultimo_valor_previsto > 85:
+        risco = "CRÍTICO"
+    elif nome_metrica.upper().find('DOWNTIME') > -1 and ultimo_valor_previsto > 5:
+        risco = "CRÍTICO"
+    elif ultimo_valor_previsto > ultimo_valor_real * 1.10:
+        risco = "ATENÇÃO"
+
+
     lista_metricas = [
         {
-            "titulo": "Modelo Utilizado",
-            "valor": resultado_modelo['nome']
+            "titulo": "Modelo Vencedor",
+            "valor": nome_modelo
         },
         {
             "titulo": "Precisão (R²)",
@@ -184,12 +203,12 @@ def processar_request_previsao(analise_req: AnaliseRequest):
         },
         {
             "titulo": "Confiabilidade",
-            "valor": f"{int(resultado_modelo['confiabilidade'])}%"
+            "valor": f"{confianca}%"
         }
     ]
     
     tipo_de_modelo = {
-        "melhorModelo": resultado_modelo['nome'],
+        "melhorModelo": nome_modelo,
         "equacao": resultado_modelo['equacao']
     }
 
@@ -205,18 +224,22 @@ def processar_request_previsao(analise_req: AnaliseRequest):
         "required": ["interpretacao"]
     }
 
+    # --- PROMPT ULTRACURTO (Capacity Planning) ---
     prompt_gemini = f"""
-    Analise a previsão para '{analise_req.metricaAnalisar}'.
-    Dados:
-    - Histórico (últimos): {valores_historicos[-5:]}
-    - Projeção: {projecao}
-    - Modelo Vencedor: {tipo_de_modelo['melhorModelo']}
-    - Erro (RMSE): {resultado_modelo['rmse']:.2f}
-    - Precisão (R²): {resultado_modelo['r2']:.2f}
-    
-    Gere 2 parágrafos curtos para 'interpretacao':
-    1. Análise da tendência e projeção futura.
-    2. Comentário sobre a confiabilidade do modelo e recomendação.
+    **ROLE:** Engenheiro de Capacidade / SysAdmin.
+    **USUÁRIO:** Analista de TI. Use linguagem técnica.
+    **REGRAS:** Máximo 30 palavras por parágrafo. Sem introduções.
+
+    **PROJEÇÃO CALCULADA:**
+    - Métrica: {nome_metrica}
+    - Valor Atual: {ultimo_valor_real:.1f}
+    - Projeção Final: {ultimo_valor_previsto:.1f}
+    - Risco Determinado: {risco} (Baseado no limite de 85% a 90% para componentes).
+    - Confiabilidade do Modelo: {confianca}%
+
+    **OUTPUT JSON (2 strings):**
+    1. **Alerta de Capacidade:** Descreva a tendência e o risco futuro. (Ex: "Risco CRÍTICO. A projeção de {nome_metrica} excede o limite de segurança em X dias." ou "Projeção ESTÁVEL, sem risco de saturação.").
+    2. **Ação Preventiva:** Dê uma recomendação técnica imediata. (Se CRÍTICO: "Agendar limpeza dos discos ou provisionamento de recurso." Se NORMAL: "Manter monitoramento; a confiabilidade é {confianca}%.").
     """
     
     try:
