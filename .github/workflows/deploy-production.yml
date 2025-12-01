@@ -39,4 +39,41 @@ jobs:
           push: true
           tags: |
             ${{ env.IMAGE_FULL_NAME }}:${{ env.IMAGE_TAG }}
+
+      - name: Deploy para EC2 e Rodar Container (Staging)
+        uses: appleboy/ssh-action@v1.0.3 
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_PRIVATE_KEY }}
+          script: |
+            CONTAINER_NAME=oberon-python-container
+            APP_USER=${{ secrets.EC2_USERNAME }}
+            IMAGE_NAME=${{ secrets.DOCKER_USERNAME }}/oberon-analise-ia
+            # Usando a tag do SHA do commit (IMAGE_TAG) para garantir a versão correta
+            IMAGE_TAG=${{ env.IMAGE_TAG }}
             
+            cd /home/$APP_USER/Oberon-Config-AWS || exit 1 
+
+            echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+            sudo docker pull $IMAGE_NAME:$IMAGE_TAG
+
+            # 2. CRIAÇÃO/SOBRESCRITA DO ARQUIVO .ENV.python NO SERVIDOR EC2
+            echo "# Arquivo .env.python gerado pelo GitHub Actions (Staging)" > .env.python
+            
+            echo "DB_HOST=${{ secrets.DB_HOST_PROD }}" >> .env.python
+            echo "DB_USER=${{ secrets.DB_USER_PROD }}" >> .env.python
+            echo "DB_PASSWORD=${{ secrets.DB_PASSWORD_PROD }}" >> .env.python
+            echo "DB_DATABASE=${{ secrets.DB_DATABASE_PROD }}" >> .env.python
+            echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" >> .env.python
+            echo "PORT=${{ secrets.PORT }}" >> .env.python
+
+            # 3. Gerenciamento do Container Antigo
+            if [ $(sudo docker ps -a -q -f name=$CONTAINER_NAME) ]; then 
+              sudo docker stop $CONTAINER_NAME 
+              sudo docker rm $CONTAINER_NAME 
+            fi
+
+            # 4. Roda o Novo Container
+            sudo docker run -d --name $CONTAINER_NAME -p 80:80 --restart always --env-file .env $IMAGE_NAME:$IMAGE_TAG
+            sudo docker image prune -f

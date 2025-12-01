@@ -115,7 +115,7 @@ def processar_request_comparacao(analise_req: AnaliseRequest):
 
     **OUTPUT JSON (2 strings):**
     1. **Diagnóstico Técnico:** Identifique a anomalia. Em qual dia exato ocorreu o pico/queda que causou o delta de {delta_str}? Classifique como "Degradação" (Piora) ou "Estabilização" (Melhora).
-    2. **Ação Recomendada (Nível L2/L3):** O que o analista deve fazer na máquina? (Ex: "Verificar Event Viewer do dia X", "Analisar processos com alto consumo", "Validar serviço de gravação", "Checar logs do VMS").
+    2. **Ação Recomendada: dependenco da metrica e comportamento o que faria sentido o analista de ti fazer.
     """
     
     try:
