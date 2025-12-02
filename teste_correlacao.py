@@ -17,11 +17,11 @@ dados_simulacao = AnaliseRequest(
     # CORRIJA AQUI: Use um nome que seu SP conhece.
     # Se sua SP não tem 'Downtime' implementado, use 'Total de Alertas' vs 'Uso CPU' para testar
     metricaAnalisar="Uptime", 
-    variavelRelacionada="Total de Alertas",      
+    variavelRelacionada="Uso DISCO",      
     
     fkEmpresa=2, 
     fkMaquina=None, 
-    componente="RAM"
+    componente=None,
 )
 
 try:
